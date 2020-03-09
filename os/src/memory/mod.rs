@@ -4,7 +4,7 @@ pub mod paging;
 
 use crate::consts::*;
 use buddy_system_allocator::LockedHeap;
-use frame_allocator::SEGMENT_TREE_ALLOCATOR as FRAME_ALLOCATOR;
+use frame_allocator::FIRST_FIT_ALLOCATOR as FRAME_ALLOCATOR;
 use memory_set::{attr::MemoryAttr, handler::Linear, MemorySet};
 use riscv::addr::{Frame, Page, PhysAddr, VirtAddr};
 use riscv::register::sstatus;
@@ -19,12 +19,27 @@ pub fn init(l: usize, r: usize) {
     println!("++++ setup memory!    ++++");
 }
 
+pub fn init_allocator(l: usize, r: usize) {
+    FRAME_ALLOCATOR.lock().init(l, r);
+}
+
 pub fn alloc_frame() -> Option<Frame> {
-    Some(Frame::of_ppn(FRAME_ALLOCATOR.lock().alloc()))
+    alloc_frames(1)
+}
+
+pub fn alloc_frames(cnt: usize) -> Option<Frame> {
+    if let Some(frame) = FRAME_ALLOCATOR.lock().alloc(cnt) {
+        return Some(Frame::of_ppn(frame));
+    }
+    return None;
 }
 
 pub fn dealloc_frame(f: Frame) {
-    FRAME_ALLOCATOR.lock().dealloc(f.number())
+    dealloc_frames(f, 1)
+}
+
+pub fn dealloc_frames(f: Frame, cnt: usize) {
+    FRAME_ALLOCATOR.lock().dealloc(f.number(), cnt)
 }
 
 fn init_heap() {

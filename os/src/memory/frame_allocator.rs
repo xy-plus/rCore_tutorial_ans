@@ -62,9 +62,64 @@ impl SegmentTreeAllocator {
     }
 }
 
-pub static SEGMENT_TREE_ALLOCATOR: Mutex<SegmentTreeAllocator> = Mutex::new(SegmentTreeAllocator {
-    a: [0; MAX_PHYSICAL_PAGES << 1],
-    m: 0,
-    n: 0,
+// pub static SEGMENT_TREE_ALLOCATOR: Mutex<SegmentTreeAllocator> = Mutex::new(SegmentTreeAllocator {
+//     a: [0; MAX_PHYSICAL_PAGES << 1],
+//     m: 0,
+//     n: 0,
+//     offset: 0,
+// });
+
+pub struct FirstFirAllocator {
+    pub frames: [bool; MAX_PHYSICAL_PAGES],
+    pub size: usize,
+    pub offset: usize,
+}
+
+pub static FIRST_FIT_ALLOCATOR: Mutex<FirstFirAllocator> = Mutex::new(FirstFirAllocator {
+    frames: [false; MAX_PHYSICAL_PAGES],
+    size: 0,
     offset: 0,
 });
+
+impl FirstFirAllocator {
+    pub fn init(&mut self, l: usize, r: usize) {
+        self.size = r - l;
+        self.offset = l;
+        for i in 0..self.size {
+            self.frames[i] = false;
+        }
+    }
+
+    pub fn alloc(&mut self, num: usize) -> Option<usize> {
+        let mut frames = &mut self.frames;
+        let size = self.size;
+        for i in 0..size {
+            if !frames[i] {
+                if i + num > size {
+                    return None;
+                }
+                let mut flag = true;
+                for j in i..(i + num) {
+                    if frames[j] {
+                        flag = false;
+                        break;
+                    }
+                }
+                if flag {
+                    for j in i..(i + num) {
+                        frames[j] = true;
+                    }
+                    return Some(i + self.offset);
+                }
+            }
+        }
+        return None;
+    }
+
+    pub fn dealloc(&mut self, mut index: usize, num: usize) {
+        index -= self.offset;
+        for i in index..(index + num) {
+            self.frames[i] = false;
+        }
+    }
+}
