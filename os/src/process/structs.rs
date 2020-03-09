@@ -2,18 +2,18 @@ use super::{ExitCode, Tid};
 use crate::alloc::alloc::{alloc, dealloc, Layout};
 use crate::consts::*;
 use crate::context::Context;
+use crate::fs::file::File;
 use crate::memory::memory_set::{attr::MemoryAttr, handler::ByFrame, MemorySet};
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use core::str;
 use riscv::register::satp;
+use spin::Mutex;
 use xmas_elf::{
     header,
     program::{Flags, SegmentData, Type},
     ElfFile,
 };
-use crate::fs::file::File;
-use spin::Mutex;
-use alloc::sync::Arc;
 
 #[derive(Clone)]
 pub enum Status {
@@ -106,7 +106,6 @@ impl Thread {
             thread.ofile[i] = Some(Arc::new(Mutex::new(File::default())));
         }
         Box::new(thread)
-        
     }
 
     // 分配文件描述符
