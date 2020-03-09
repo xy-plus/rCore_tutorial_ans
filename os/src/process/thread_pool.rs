@@ -24,6 +24,7 @@ impl ThreadPool {
             scheduler,
         }
     }
+
     fn alloc_tid(&self) -> Tid {
         for (i, info) in self.threads.iter().enumerate() {
             if info.is_none() {
@@ -85,5 +86,10 @@ impl ThreadPool {
 
     pub fn set_priority(&mut self, priority: usize) {
         self.scheduler.set_priority(priority)
+    }
+
+    pub fn set_sleep(&mut self, tid: Tid) {
+        let proc = self.threads[tid].as_mut().expect("thread not exist");
+        proc.status = Status::Sleeping;
     }
 }
