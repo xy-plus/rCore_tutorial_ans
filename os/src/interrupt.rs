@@ -1,7 +1,7 @@
 use crate::context::TrapFrame;
 use crate::memory::access_pa_via_va;
 use crate::process::tick;
-use crate::timer::{clock_set_next_event, TICKS};
+use crate::timer::clock_set_next_event;
 use riscv::register::sie;
 use riscv::register::{
     scause::{self, Exception, Interrupt, Trap},
