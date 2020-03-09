@@ -11,6 +11,13 @@ pub trait MemoryHandler: Debug + 'static {
     fn map(&self, pt: &mut PageTableImpl, va: usize, attr: &MemoryAttr);
     fn unmap(&self, pt: &mut PageTableImpl, va: usize);
     fn page_copy(&self, pt: &mut PageTableImpl, va: usize, src: usize, length: usize);
+    fn clone_map(
+        &self,
+        pt: &mut PageTableImpl,
+        src_pt: &mut PageTableImpl,
+        vaddr: usize,
+        attr: &MemoryAttr,
+    );
 }
 
 impl Clone for Box<dyn MemoryHandler> {
@@ -56,6 +63,15 @@ impl MemoryHandler for Linear {
             }
         }
     }
+    fn clone_map(
+        &self,
+        pt: &mut PageTableImpl,
+        _src_pt: &mut PageTableImpl,
+        vaddr: usize,
+        attr: &MemoryAttr,
+    ) {
+        self.map(pt, vaddr, attr);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -93,5 +109,16 @@ impl MemoryHandler for ByFrame {
                 dst[i] = 0;
             }
         }
+    }
+    fn clone_map(
+        &self,
+        pt: &mut PageTableImpl,
+        src_pt: &mut PageTableImpl,
+        vaddr: usize,
+        attr: &MemoryAttr,
+    ) {
+        self.map(pt, vaddr, attr);
+        let data = src_pt.get_page_slice_mut(vaddr);
+        pt.get_page_slice_mut(vaddr).copy_from_slice(data);
     }
 }

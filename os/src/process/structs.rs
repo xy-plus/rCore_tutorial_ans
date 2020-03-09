@@ -1,7 +1,7 @@
 use super::{ExitCode, Tid};
 use crate::alloc::alloc::{alloc, dealloc, Layout};
 use crate::consts::*;
-use crate::context::Context;
+use crate::context::{Context, TrapFrame};
 use crate::fs::file::File;
 use crate::memory::memory_set::{attr::MemoryAttr, handler::ByFrame, MemorySet};
 use alloc::boxed::Box;
@@ -28,6 +28,7 @@ pub struct Thread {
     pub kstack: KernelStack,
     pub wait: Option<Tid>,
     pub ofile: [Option<Arc<Mutex<File>>>; NOFILE],
+    pub vm: Option<Arc<Mutex<MemorySet>>>,
 }
 
 impl Thread {
@@ -45,6 +46,7 @@ impl Thread {
                 kstack: kstack_,
                 wait: None,
                 ofile: [None; NOFILE],
+                vm: None,
             })
         }
     }
@@ -55,6 +57,7 @@ impl Thread {
             kstack: KernelStack::new_empty(),
             wait: None,
             ofile: [None; NOFILE],
+            vm: None,
         })
     }
 
@@ -101,6 +104,7 @@ impl Thread {
             kstack: kstack,
             wait: wait_thread,
             ofile: [None; NOFILE],
+            vm: Some(Arc::new(Mutex::new(vm))),
         };
         for i in 0..3 {
             thread.ofile[i] = Some(Arc::new(Mutex::new(File::default())));
@@ -120,10 +124,26 @@ impl Thread {
         self.ofile[fd] = Some(Arc::new(Mutex::new(File::default())));
         fd as i32
     }
+
     // 回收文件描述符
     pub fn dealloc_fd(&mut self, fd: i32) {
         assert!(self.ofile[fd as usize].is_some());
         self.ofile[fd as usize] = None;
+    }
+
+    /// Fork a new process from current one
+    pub fn fork(&self, tf: &TrapFrame) -> Box<Thread> {
+        let kstack = KernelStack::new();
+        let vm = self.vm.as_ref().unwrap().lock().clone();
+        let vm_token = vm.token();
+        let context = unsafe { Context::new_fork(tf, kstack.top(), vm_token) };
+        Box::new(Thread {
+            context,
+            kstack,
+            wait: self.wait.clone(),
+            vm: Some(Arc::new(Mutex::new(vm))),
+            ofile: [None; NOFILE],
+        })
     }
 }
 
