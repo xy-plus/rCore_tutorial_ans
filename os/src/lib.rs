@@ -12,6 +12,7 @@ mod io;
 
 mod consts;
 mod context;
+mod drivers;
 mod fs;
 mod init;
 mod interrupt;

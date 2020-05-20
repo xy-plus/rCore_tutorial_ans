@@ -34,13 +34,25 @@ pub fn init() {
 pub unsafe fn init_external_interrupt() {
     let HART0_S_MODE_INTERRUPT_ENABLES: *mut u32 = access_pa_via_va(0x0c00_2080) as *mut u32;
     const SERIAL: u32 = 0xa;
-    HART0_S_MODE_INTERRUPT_ENABLES.write_volatile(1 << SERIAL);
+    const VIRTIO0: u32 = 0x1;
+    HART0_S_MODE_INTERRUPT_ENABLES.write_volatile(1 << SERIAL | 1 << VIRTIO0);
 }
 
 pub unsafe fn enable_serial_interrupt() {
     let UART16550: *mut u8 = access_pa_via_va(0x10000000) as *mut u8;
     UART16550.add(4).write_volatile(0x0B);
     UART16550.add(1).write_volatile(0x01);
+}
+
+pub fn plic_claim() -> i32 {
+    let irq = access_pa_via_va(0x0c20_1004) as *const i32;
+    unsafe { *irq }
+}
+
+pub fn plic_complete(irq: i32) {
+    unsafe {
+        *(access_pa_via_va(0x0c20_1004) as *mut i32) = irq;
+    }
 }
 
 #[no_mangle]
@@ -52,7 +64,7 @@ pub fn rust_trap(tf: &mut TrapFrame) {
         Trap::Exception(Exception::LoadPageFault) => page_fault(tf),
         Trap::Exception(Exception::StorePageFault) => page_fault(tf),
         Trap::Exception(Exception::UserEnvCall) => syscall(tf),
-        Trap::Interrupt(Interrupt::SupervisorExternal) => external(),
+        Trap::Interrupt(Interrupt::SupervisorExternal) => external(tf),
         _ => panic!("undefined trap!"),
     }
 }
@@ -82,8 +94,21 @@ fn syscall(tf: &mut TrapFrame) {
     tf.x[10] = ret as usize;
 }
 
-fn external() {
-    let _ = try_serial();
+fn external(tf: &mut TrapFrame) {
+    if tf.scause.is_interrupt() && (tf.scause.bits() & 0xff == 0x9) {
+        let irq = plic_claim();
+        if irq == 0x01 {
+            crate::drivers::virtio_disk::virtio_disk_intr();
+        } else if irq == 0x0a {
+            try_serial();
+        } else {
+        }
+        if irq > 0 {
+            plic_complete(irq);
+        }
+    } else {
+        panic!("unhandled external!");
+    }
 }
 
 fn try_serial() -> bool {

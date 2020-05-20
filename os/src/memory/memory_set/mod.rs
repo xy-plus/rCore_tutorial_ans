@@ -33,6 +33,18 @@ impl MemorySet {
         }
         self.areas.push(area);
     }
+    pub fn push_mmio(&mut self, l: usize, r: usize) {
+        // check alignment
+        assert!(l & (PAGE_SIZE - 1) == 0);
+        assert!(r & (PAGE_SIZE - 1) == 0);
+        self.push(
+            access_pa_via_va(l),
+            access_pa_via_va(r),
+            MemoryAttr::new(),
+            Linear::new(PHYSICAL_MEMORY_OFFSET),
+            None,
+        );
+    }
     fn test_free_area(&self, start: usize, end: usize) -> bool {
         self.areas
             .iter()
@@ -104,6 +116,14 @@ impl MemorySet {
             Linear::new(offset),
             None,
         );
+        // PLIC for RISC-V virt machine
+        self.push_mmio(0x0c00_2000, 0x0c00_3000);
+        // 16550a UART for RISC-V virt machine
+        self.push_mmio(0x1000_0000, 0x1000_1000);
+        // VIRTIO0 for RISC-V virt machine
+        self.push_mmio(0x1000_1000, 0x1000_2000);
+        // RISC-V IRQ(maybe)
+        self.push_mmio(0x0c20_1000, 0x0c20_2000);
     }
     pub fn token(&self) -> usize {
         self.page_table.token()

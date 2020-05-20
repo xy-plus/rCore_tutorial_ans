@@ -13,8 +13,6 @@ env:
 	rustup component add llvm-tools-preview
 	rustup target add $(target)
 
-export USER_IMG = ../usr/build/riscv64.img
-
 kernel:
 	cargo build
 
@@ -34,6 +32,8 @@ qemu: build
 		-machine virt \
 		-nographic \
 		-bios default \
-		-device loader,file=$(bin),addr=0x80200000
-
+		-device loader,file=$(bin),addr=0x80200000 \
+		-drive file=../usr/build/riscv64.img,if=none,format=raw,id=x0 \
+		-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+		
 run: build qemu
